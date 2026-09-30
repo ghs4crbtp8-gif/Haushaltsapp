@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6b7d5a">
+<title>Unser Haushaltsplan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f3ee;--card:#fff;--text:#263028;--muted:#68736b;--accent:#6b7d5a;--accent2:#dfe8d9;--line:#e6e3dc;--danger:#a54d4d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:var(--accent);color:#fff;padding:20px 16px}h1{font-size:24px;margin:0 0 4px}header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:900px;margin:auto;padding:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px #00000008}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+button,input,select,textarea{font:inherit}button{border:0;border-radius:12px;padding:10px 13px;background:var(--accent);color:white;font-weight:650}button.secondary{background:var(--accent2);color:var(--text)}button.danger{background:#f3dcdc;color:#7d2f2f}
+input,select,textarea{border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff;color:var(--text)}
+.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.tab{white-space:nowrap}.tab.active{background:var(--accent)}
+.progress{height:10px;background:#ebe9e3;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--accent);width:0}
+.task{border:1px solid var(--line);border-radius:15px;padding:12px;margin:9px 0;display:flex;gap:12px;align-items:flex-start}.task.done{opacity:.55}
+.task input[type=checkbox]{width:23px;height:23px;margin-top:2px;accent-color:var(--accent)}.taskmain{flex:1;min-width:0}.title{font-weight:700}.meta{font-size:12px;color:var(--muted);margin-top:4px}
+.badge{display:inline-block;background:var(--accent2);padding:3px 7px;border-radius:99px;font-size:11px;margin-right:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}.stat{background:#faf9f6;border:1px solid var(--line);border-radius:14px;padding:12px}.stat b{font-size:21px;display:block}
+.muted{color:var(--muted)}.notice{background:#fff8e7;border:1px solid #ead9a7;padding:12px;border-radius:13px}.hidden{display:none!important}
+.fab{position:fixed;right:18px;bottom:18px;z-index:30;border-radius:999px;padding:14px 18px;box-shadow:0 8px 24px #0002;font-size:15px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.modal{position:fixed;inset:0;background:#0006;z-index:30;display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.modalbox,.modal-card{width:min(650px,100%);max-height:90vh;overflow:auto;background:var(--card);border-radius:20px;padding:18px;box-shadow:0 10px 40px #0003}.modal textarea{width:100%}
+.modal-card label{display:block;font-weight:700;margin:10px 0}.modal-card label input{display:block;width:100%;margin-top:5px;font-weight:400}
+.ai{background:#eef7ff;border:1px solid #cfe5f7;padding:12px;border-radius:13px}.ai h3{margin:0 0 6px}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#f1f1f1;font-size:12px;margin:3px 3px 0 0}
+#setup{position:fixed;inset:0;background:#f5f3ee;z-index:40;padding:20px;overflow:auto}#setup .box{max-width:600px;margin:30px auto}
+.calendar-panel{margin:14px 0;padding:14px;border:1px solid #e5e7eb;border-radius:18px;background:#fff}.calendar-panel h3{margin:0 0 10px}.calendar-list{display:grid;gap:8px}
+.calendar-item{padding:10px 12px;border-radius:14px;background:#f8fafc;border:1px solid #e5e7eb}.calendar-item .date{font-weight:700}.calendar-item .meta{font-size:.86rem;color:#64748b;margin-top:3px}
+.calendar-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="setup"><div class="box card">
+<h2>Unser Haushaltsplan verbinden</h2>
+<p>Gib euren gemeinsamen Haushaltscode ein und wähle aus, wer du bist.</p>
+<input id="houseCode" placeholder="z. B. MEINHAUSHALT" style="width:100%;text-transform:uppercase">
+<div style="margin-top:10px"><label style="display:block;margin-bottom:6px;font-weight:700">Dein Profil</label>
+<select id="profile" style="width:100%"><option value="Philipp">Philipp</option><option value="Sarah">Sarah</option></select></div>
+<div style="margin-top:10px"><button id="connect">Verbinden</button></div>
+<p id="setupMsg" class="muted"></p><p class="muted">Der Code ist nur ein einfacher gemeinsamer Schlüssel. Teile ihn nicht öffentlich.</p>
+</div></div>
+
+<header><h1>Unser Haushaltsplan</h1><p>Gemeinsam organisiert – mit Rücksicht auf Schwangerschaft und Hund.</p><div id="profileBadge" style="margin-top:7px;font-size:13px;font-weight:700"></div></header>
+<main>
+<section class="calendar-panel"><h3>📅 Gemeinsame Termine</h3><div id="calendarList" class="calendar-list"></div><button type="button" onclick="openAppointmentModal()">＋ Gemeinsamen Termin hinzufügen</button></section>
+
+<div class="card"><div class="row between"><div><b>Synchronisation</b><div id="sync" class="muted">Verbinde…</div></div><button class="secondary" id="changeCode">Haushalt wechseln</button></div></div>
+
+<div class="tabs">
+<button class="tab active" data-filter="today">Heute</button><button class="tab secondary" data-filter="mine">Meine Aufgaben</button><button class="tab secondary" data-filter="shared">Gemeinsam</button>
+<button class="tab secondary" data-filter="weekly">Woche</button><button class="tab secondary" data-filter="monthly">Monat</button><button class="tab secondary" data-filter="all">Alle</button>
+</div>
+
+<div class="card"><div class="row between"><b>Fortschritt</b><span id="progressText"></span></div><div class="progress"><div class="bar" id="bar"></div></div></div>
+<div class="card"><div class="grid" id="stats"></div></div>
+
+<div class="card ai">
+<h3>🧠 Kostenloser Haushaltsplaner</h3>
+<div id="plannerSummary"></div><div id="plannerHints" class="muted" style="margin-top:7px"></div>
+<button id="runPlanner" style="margin-top:10px">✨ Plan für heute erstellen</button>
+<div id="plannerStatus" class="muted" style="margin-top:7px"></div>
+</div>
+
+<div id="tasks"></div>
+<button class="fab" id="openAdd">＋ Aufgabe hinzufügen</button>
+
+<div id="addModal" class="modal hidden"><div class="modalbox">
+<div class="row between"><h3 style="margin:0">Neue Aufgabe</h3><button class="secondary" id="closeAdd">Schließen</button></div>
+<p class="muted">Fehlt etwas im Haushaltsplan? Hier kannst du jederzeit eine eigene Aufgabe anlegen.</p>
+<div class="formgrid">
+<input id="newTitle" placeholder="z. B. Müll rausbringen">
+<select id="newRoom"><option>Wohnzimmer + Küche</option><option>Schlafzimmer</option><option>Bad</option><option>Flur</option><option>HWR</option><option>Hund</option></select>
+<select id="newFreq"><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="monthly">Monatlich</option><option value="once">Einmalig</option></select>
+<select id="newAssignee"><option value="Philipp">Philipp</option><option value="Sarah">Sarah</option><option value="Gemeinsam">Gemeinsam</option></select>
+<select id="newEffort"><option>leicht</option><option>besser übernehmen</option></select>
+<select id="newPoints"><option value="1">1 Punkt</option><option value="2" selected>2 Punkte</option><option value="3">3 Punkte</option><option value="5">5 Punkte</option></select>
+</div><div style="margin-top:12px"><button id="add">Aufgabe speichern</button></div>
+</div></div>
+
+<div class="card ai">
+<h3>🤰 Schwangerschafts-Check-ins</h3>
+<div id="pregnancySummary" class="muted"></div><div id="aiSuggestions" style="margin-top:8px"></div>
+<div class="row" style="margin-top:10px"><button class="secondary" id="openDailyBtn">Tages-Check-in</button><button class="secondary" id="openPregnancy">Wochen-Check-in</button></div>
+</div>
+
+<div id="dailyModal" class="modal hidden"><div class="modalbox">
+<div class="row between"><h3 style="margin:0">🤰 Sarahs Tages-Check-in</h3><button class="secondary" id="closeDaily">Später</button></div>
+<p class="muted">Der kurze Check-in hilft dem Haushaltsplaner, die vorhandenen Aufgaben passend zu verteilen.</p>
+<div class="formgrid">
+<select id="dailyFeeling"><option value="">Wie fühlst du dich heute?</option><option>sehr gut</option><option>gut</option><option>okay</option><option>eher müde</option><option>nicht gut</option></select>
+<select id="dailyEnergy"><option value="">Wie viel Energie hast du?</option><option>hoch</option><option>mittel</option><option>niedrig</option></select>
+</div>
+<textarea id="dailyNotes" rows="3" style="margin-top:9px;width:100%" placeholder="Optional: Was fällt dir heute schwer oder soll Philipp übernehmen?"></textarea>
+<div class="notice" style="margin-top:10px">Die Angaben dienen nur der Organisation des Haushalts und sind keine medizinische Einschätzung.</div>
+<button id="saveDaily" style="margin-top:10px">Für heute speichern</button>
+</div></div>
+
+<div id="pregnancyModal" class="modal hidden"><div class="modalbox">
+<div class="row between"><h3 style="margin:0">Wöchentlicher Check-in</h3><button class="secondary" id="closePregnancy">Schließen</button></div>
+<p class="muted">Sarah, welche Schwangerschaftswoche ist es gerade und wie fühlst du dich diese Woche?</p>
+<div class="formgrid">
+<input id="pregWeek" type="number" min="1" max="45" placeholder="Schwangerschaftswoche">
+<select id="pregFeeling"><option value="">Wie fühlst du dich?</option><option>sehr gut</option><option>gut</option><option>okay</option><option>eher müde</option><option>nicht gut</option></select>
+<select id="pregEnergy"><option value="">Energie diese Woche</option><option>hoch</option><option>mittel</option><option>niedrig</option></select>
+</div>
+<input id="pregLimitations" style="width:100%;margin-top:9px" placeholder="Optional: Was fällt dir diese Woche schwer?">
+<textarea id="pregNotes" rows="3" style="margin-top:9px" placeholder="Optional: Was sollte Philipp diese Woche besonders übernehmen?"></textarea>
+<div class="notice" style="margin-top:10px">Die Angaben dienen ausschließlich der Haushaltsorganisation und ersetzen keine medizinische Empfehlung.</div>
+<button id="savePregnancy" style="margin-top:10px">Check-in speichern</button>
+</div></div>
+
+<div class="card"><h3>Notizen</h3><textarea id="notes" rows="3" style="width:100%" placeholder="Einkäufe, Absprachen, wichtige Hinweise…"></textarea></div>
+<div class="card notice"><b>Hinweis:</b> Schwangerschaftsangaben werden nur zur organisatorischen Aufgabenverteilung verwendet. Die App gibt keine medizinischen Empfehlungen.</div>
+</main>
+
+<div id="appointmentModal" class="modal" style="display:none"><div class="modal-card">
+<h3>📅 Gemeinsamen Termin</h3>
+<label>Titel<input id="apptTitle" type="text" placeholder="z. B. Hebammentermin"></label>
+<label>Datum<input id="apptDate" type="date"></label>
+<label>Uhrzeit<input id="apptTime" type="time"></label>
+<label>Ort / Notiz<input id="apptNote" type="text" placeholder="Optional"></label>
+<div class="calendar-actions"><button type="button" onclick="saveAppointment()">Speichern</button><button type="button" class="secondary" onclick="closeAppointmentModal()">Abbrechen</button></div>
+</div></div>
+
+<script>
+const SUPABASE_URL="https://rvhvqjewgzoyflqdrgvs.supabase.co";
+const SUPABASE_KEY="sb_publishable_lXhFMEXk2_ABEmjHOQc3-g_c3swkMAT";
+const AI_FUNCTION_URL=SUPABASE_URL+"/functions/v1/haushaltsplan-ai";
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const DEFAULT_TASKS=[
+["Wohnzimmer + Essbereich aufräumen","Wohnzimmer + Küche","daily",2,"leicht","Gemeinsam"],
+["Küchenarbeitsflächen wischen","Wohnzimmer + Küche","daily",2,"leicht","Philipp"],
+["Spülmaschine ausräumen","Wohnzimmer + Küche","daily",2,"leicht","Sarah"],
+["Spülmaschine einräumen","Wohnzimmer + Küche","daily",2,"leicht","Philipp"],
+["Esstisch abwischen","Wohnzimmer + Küche","daily",1,"leicht","Gemeinsam"],
+["Bett machen","Schlafzimmer","daily",1,"leicht","Sarah"],
+["Bad kurz sauber halten","Bad","daily",2,"leicht","Philipp"],
+["Hund füttern","Hund","daily",2,"leicht","Sarah"],
+["Hund Wasser auffüllen","Hund","daily",1,"leicht","Philipp"],
+["Hund kurz ausführen","Hund","daily",3,"leicht","Gemeinsam"],
+["Flur saugen","Flur","weekly",3,"leicht","Philipp"],
+["Wohnzimmer + Küche saugen","Wohnzimmer + Küche","weekly",3,"leicht","Sarah"],
+["Schlafzimmer saugen","Schlafzimmer","weekly",3,"leicht","Philipp"],
+["Bad gründlich reinigen","Bad","weekly",5,"besser übernehmen","Philipp"],
+["Dusche gründlich reinigen","Bad","weekly",4,"besser übernehmen","Philipp"],
+["Handtücher wechseln","Bad","weekly",2,"leicht","Sarah"],
+["Waschmaschine starten","HWR","weekly",3,"leicht","Philipp"],
+["Wäsche zusammenlegen","HWR","weekly",3,"leicht","Sarah"],
+["Wäsche wegräumen","HWR","weekly",2,"leicht","Sarah"],
+["Kühlschrank kontrollieren","Wohnzimmer + Küche","weekly",2,"leicht","Gemeinsam"],
+["Vorräte prüfen","HWR","weekly",2,"leicht","Gemeinsam"],
+["Bettwäsche wechseln","Schlafzimmer","monthly",4,"leicht","Gemeinsam"],
+["Kühlschrank gründlich reinigen","Wohnzimmer + Küche","monthly",5,"besser übernehmen","Philipp"],
+["HWR aufräumen","HWR","monthly",4,"leicht","Philipp"],
+["Fenster innen reinigen","Wohnzimmer + Küche","monthly",5,"besser übernehmen","Philipp"],
+["Hundebereich gründlich reinigen","Hund","weekly",4,"leicht","Philipp"]
+];
+
+let state=null,filter="today",houseCode=localStorage.getItem("household_code")||"",profile=localStorage.getItem("household_profile")||"";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+function weekKey(){const d=new Date(),one=new Date(d.getFullYear(),0,1);return d.getFullYear()+"-"+Math.ceil((((d-one)/86400000)+one.getDay()+1)/7)}
+function freshState(){return{tasks:DEFAULT_TASKS.map((x,i)=>({id:"t"+i,title:x[0],room:x[1],freq:x[2],points:x[3],effort:x[4],assignee:x[5],done:false,lastDone:null,nextDue:null})),scores:{Philipp:0,Sarah:0,Gemeinsam:0},customNotes:"",appointments:[],pregnancy:{week:null,feeling:"",energy:"",limitations:"",notes:"",checkedAt:"",daily:{date:"",feeling:"",energy:"",notes:""}},planner:{lastRun:"",summary:""}}}
+function normalize(){
+ if(!state||typeof state!=="object")state=freshState();
+ if(!Array.isArray(state.tasks))state.tasks=[];
+ state.tasks.forEach(t=>{if(t.lastDone===undefined)t.lastDone=null;if(t.nextDue===undefined)t.nextDue=null});
+ if(!state.scores)state.scores={Philipp:0,Sarah:0,Gemeinsam:0};
+ if(!Array.isArray(state.appointments))state.appointments=[];
+ if(!state.pregnancy)state.pregnancy={week:null,feeling:"",energy:"",limitations:"",notes:"",checkedAt:"",daily:{date:"",feeling:"",energy:"",notes:""}};
+ if(!state.pregnancy.daily)state.pregnancy.daily={date:"",feeling:"",energy:"",notes:""};
+ if(!state.planner)state.planner={lastRun:"",summary:""};
+}
+function nextDate(freq,from=new Date()){const d=new Date(from);if(freq==="daily")d.setDate(d.getDate()+1);else if(freq==="weekly")d.setDate(d.getDate()+7);else if(freq==="monthly")d.setMonth(d.getMonth()+1);else return null;return d.toISOString().slice(0,10)}
+function isDue(t){if(t.done)return false;if(t.freq==="once")return true;if(!t.lastDone)return true;return !t.nextDue||t.nextDue<=today()}
+function pregnancyData(){normalize();return state.pregnancy}
+function visible(t){
+ if(filter==="mine")return t.assignee===profile;
+ if(filter==="shared")return t.assignee==="Gemeinsam";
+ if(filter==="today")return isDue(t)&&(t.assignee===profile||t.assignee==="Gemeinsam");
+ if(filter==="weekly")return !t.done&&(t.assignee===profile||t.assignee==="Gemeinsam");
+ if(filter==="monthly")return t.freq==="monthly"&&(t.assignee===profile||t.assignee==="Gemeinsam");
+ return true;
+}
+async function getState(){
+ const {data,error}=await client.from("household_state").select("state,updated_at").eq("id",houseCode).maybeSingle();
+ if(error)throw error;
+ if(!data){state=freshState();await putState()}else{state=data.state;normalize()}
+ render();
+}
+async function putState(){const {error}=await client.from("household_state").upsert({id:houseCode,state,updated_at:new Date().toISOString()});if(error)throw error}
+async function save(){try{$("sync").textContent="Speichere…";await putState();$("sync").textContent="Synchronisiert"}catch(e){$("sync").textContent="Fehler: "+e.message}}
+
+function energyNumber(v){return v==="hoch"?8:v==="mittel"?5:v==="niedrig"?2:null}
+function feelingNumber(v){return v==="sehr gut"?9:v==="gut"?8:v==="okay"?6:v==="eher müde"?4:v==="nicht gut"?2:null}
+function pregnancyPayload(){
+ const p=pregnancyData(),d=p.daily?.date===today()?p.daily:{};
+ return{
+  daily:{energy:energyNumber(d.energy),wellbeing:feelingNumber(d.feeling),notes:d.notes||""},
+  weekly:{energy:energyNumber(p.energy),wellbeing:feelingNumber(p.feeling),week:p.week,limitations:p.limitations||"",notes:p.notes||""}
+ };
+}
+async function runFreePlanner(){
+ $("plannerStatus").textContent="Plan wird erstellt…";
+ $("runPlanner").disabled=true;
+ try{
+  const due=state.tasks.filter(t=>!t.done);
+  const res=await fetch(AI_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_KEY},body:JSON.stringify({tasks:due,pregnancy:pregnancyPayload(),appointments:state.appointments||[],profile})});
+  const data=await res.json();
+  if(!res.ok||!data.ok)throw new Error(data.error||"Planer konnte nicht ausgeführt werden.");
+  const byId=new Map(state.tasks.map(t=>[String(t.id),t]));
+  let changed=0;
+  for(const a of data.plan?.assignments||[]){
+   const t=byId.get(String(a.taskId));
+   if(t&&!t.done&&["Philipp","Sarah","Gemeinsam"].includes(a.assignee)){if(t.assignee!==a.assignee)changed++;t.assignee=a.assignee}
+  }
+  state.planner={lastRun:new Date().toISOString(),summary:data.plan?.summary||""};
+  await save();render();
+  $("plannerStatus").textContent=`Plan angewendet · ${changed} Zuordnung(en) geändert.`;
+ }catch(e){$("plannerStatus").textContent="Fehler: "+e.message}
+ finally{$("runPlanner").disabled=false}
+}
+
+function renderPlanner(){
+ const due=state.tasks.filter(isDue),mine=due.filter(t=>t.assignee===profile),shared=due.filter(t=>t.assignee==="Gemeinsam");
+ $("plannerSummary").innerHTML=`<b>Heute:</b> ${mine.length} eigene + ${shared.length} gemeinsame fällige Aufgaben.`;
+ const p=pregnancyData(),daily=p.daily?.date===today()?`Tages-Check-in: ${esc(p.daily.feeling||"nicht angegeben")}${p.daily.energy?" · Energie "+esc(p.daily.energy):""}`:"Heute noch kein Tages-Check-in";
+ $("plannerHints").innerHTML=(state.planner.summary?`Letzter Plan: ${esc(state.planner.summary)}<br>`:"")+(p.week?`SSW ${p.week} · ${esc(p.feeling||"Befinden nicht angegeben")} · `:"")+daily;
+}
+function renderPregnancy(){
+ const p=pregnancyData(),d=p.daily?.date===today()?` · Heute: ${p.daily.feeling||"nicht angegeben"}${p.daily.energy?" · Energie: "+p.daily.energy:""}`:" · Heute noch nicht ausgefüllt";
+ $("pregnancySummary").textContent=(p.week?`Wochen-Check-in: SSW ${p.week} · ${p.feeling||"Befinden nicht angegeben"}${p.energy?" · Energie: "+p.energy:""}`:"Noch kein wöchentlicher Check-in.")+d;
+ $("aiSuggestions").innerHTML="<span class='pill'>Check-ins werden beim nächsten „Plan für heute“ berücksichtigt.</span>";
+}
+function recalcScores(){state.scores={Philipp:0,Sarah:0,Gemeinsam:0};state.tasks.filter(t=>t.done).forEach(t=>state.scores[t.assignee]=(state.scores[t.assignee]||0)+(Number(t.points)||0))}
+function render(){
+ normalize();recalcScores();$("profileBadge").textContent=profile?"Angemeldet als "+profile:"";
+ const list=state.tasks.filter(visible),done=list.filter(t=>t.done).length;
+ $("progressText").textContent=done+" / "+list.length;$("bar").style.width=(list.length?done/list.length*100:0)+"%";$("tasks").innerHTML="";
+ const groups={};list.forEach(t=>(groups[t.room]??=[]).push(t));
+ if(!list.length)$("tasks").innerHTML='<div class="card"><b>Keine Aufgaben in dieser Ansicht.</b></div>';
+ else Object.entries(groups).forEach(([room,items])=>{const card=document.createElement("div");card.className="card";card.innerHTML="<h3>"+esc(room)+"</h3>";items.forEach(t=>{const el=document.createElement("div");el.className="task"+(t.done?" done":"");el.innerHTML=`<input type="checkbox" ${t.done?"checked":""}><div class="taskmain"><div class="title">${esc(t.title)}</div><div class="meta"><span class="badge">${esc(t.assignee)}</span><span class="badge">${esc(t.effort)}</span><span class="badge">${t.points} P</span><span class="badge">${esc(t.freq)}</span></div></div>`;el.querySelector("input").onchange=async()=>{t.done=el.querySelector("input").checked;if(t.done){t.lastDone=today();t.nextDue=nextDate(t.freq)}else{t.lastDone=null;t.nextDue=null}render();await save()};card.appendChild(el)});$("tasks").appendChild(card)});
+ renderPlanner();renderPregnancy();renderCalendar();
+ $("stats").innerHTML=Object.entries(state.scores).map(([k,v])=>`<div class="stat"><small>${k}</small><b>${v}</b><small>Punkte erledigt</small></div>`).join("");
+ $("notes").value=state.customNotes||"";
+}
+async function connect(){
+ houseCode=$("houseCode").value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");profile=$("profile").value;
+ if(!houseCode){$("setupMsg").textContent="Bitte einen Haushaltscode eingeben.";return}
+ localStorage.setItem("household_code",houseCode);localStorage.setItem("household_profile",profile);$("setupMsg").textContent="Verbinde…";
+ try{$("newAssignee").value=profile;await getState();$("setup").classList.add("hidden");$("sync").textContent="Verbunden als "+profile;if(profile==="Sarah")setTimeout(openSarahCheckins,500)}
+ catch(e){$("setupMsg").textContent="Fehler: "+e.message}
+}
+function openPregnancy(){const p=pregnancyData();$("pregWeek").value=p.week||"";$("pregFeeling").value=p.feeling||"";$("pregEnergy").value=p.energy||"";$("pregLimitations").value=p.limitations||"";$("pregNotes").value=p.notes||"";$("pregnancyModal").classList.remove("hidden")}
+function openDaily(){const p=pregnancyData(),d=p.daily?.date===today()?p.daily:{date:today(),feeling:"",energy:"",notes:""};$("dailyFeeling").value=d.feeling||"";$("dailyEnergy").value=d.energy||"";$("dailyNotes").value=d.notes||"";$("dailyModal").classList.remove("hidden")}
+function openSarahCheckins(){const p=pregnancyData();if(p.daily?.date!==today())openDaily();else if(p.checkedAt!==weekKey())openPregnancy()}
+
+$("connect").onclick=connect;
+$("changeCode").onclick=()=>{$("setup").classList.remove("hidden");$("houseCode").value=houseCode;$("profile").value=profile||"Philipp"};
+$("runPlanner").onclick=runFreePlanner;
+$("openAdd").onclick=()=>{$("addModal").classList.remove("hidden");$("newAssignee").value=profile||"Philipp"};
+$("closeAdd").onclick=()=>$("addModal").classList.add("hidden");
+$("add").onclick=async()=>{const title=$("newTitle").value.trim();if(!title)return;state.tasks.push({id:"x"+Date.now(),title,room:$("newRoom").value,freq:$("newFreq").value,points:Number($("newPoints").value),effort:$("newEffort").value,assignee:$("newAssignee").value,done:false,lastDone:null,nextDue:null});$("newTitle").value="";$("addModal").classList.add("hidden");render();await save()};
+$("notes").onchange=async()=>{state.customNotes=$("notes").value;await save()};
+$("openDailyBtn").onclick=openDaily;$("openPregnancy").onclick=openPregnancy;
+$("closeDaily").onclick=()=>$("dailyModal").classList.add("hidden");$("closePregnancy").onclick=()=>$("pregnancyModal").classList.add("hidden");
+$("saveDaily").onclick=async()=>{state.pregnancy.daily={date:today(),feeling:$("dailyFeeling").value,energy:$("dailyEnergy").value,notes:$("dailyNotes").value.trim()};$("dailyModal").classList.add("hidden");render();await save();if(state.pregnancy.checkedAt!==weekKey())setTimeout(openPregnancy,250)};
+$("savePregnancy").onclick=async()=>{const week=Number($("pregWeek").value);if(!week||week<1||week>45){$("pregWeek").focus();return}const daily=state.pregnancy.daily||{date:"",feeling:"",energy:"",notes:""};state.pregnancy={week,feeling:$("pregFeeling").value,energy:$("pregEnergy").value,limitations:$("pregLimitations").value.trim(),notes:$("pregNotes").value.trim(),checkedAt:weekKey(),daily};$("pregnancyModal").classList.add("hidden");render();await save()};
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll(".tab").forEach(x=>{x.classList.toggle("active",x===b);x.classList.toggle("secondary",x!==b)});render()});
+
+function appointments(){normalize();return state.appointments}
+function openAppointmentModal(){const d=new Date(),iso=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);$("appointmentModal").style.display="flex";$("apptDate").value=iso;$("apptTime").value="";$("apptTitle").value="";$("apptNote").value=""}
+function closeAppointmentModal(){$("appointmentModal").style.display="none"}
+async function saveAppointment(){const title=$("apptTitle").value.trim(),date=$("apptDate").value,time=$("apptTime").value,note=$("apptNote").value.trim();if(!title||!date){alert("Bitte Titel und Datum eingeben.");return}appointments().push({id:"a_"+Date.now(),title,date,time,note});await save();closeAppointmentModal();renderCalendar()}
+async function deleteAppointment(id){state.appointments=appointments().filter(a=>a.id!==id);await save();renderCalendar()}
+function icsEscape(v){return String(v||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
+function makeICS(a){
+ const start=a.date.replace(/-/g,""),dt=a.time?start+"T"+a.time.replace(":","")+"00":start;
+ let lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Unser Haushaltsplan//DE","BEGIN:VEVENT","UID:"+a.id+"@unser-haushaltsplan","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,""),a.time?"DTSTART:"+dt:"DTSTART;VALUE=DATE:"+dt,"SUMMARY:"+icsEscape(a.title)];
+ if(a.note)lines.push("DESCRIPTION:"+icsEscape(a.note));lines.push("END:VEVENT","END:VCALENDAR");
+ const blob=new Blob([lines.join("\r\n")],{type:"text/calendar;charset=utf-8"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="termin-"+a.date+".ics";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+}
+function renderCalendar(){
+ const el=$("calendarList");if(!el||!state)return;const list=appointments().slice().sort((a,b)=>(a.date+(a.time||"")).localeCompare(b.date+(b.time||"")));
+ if(!list.length){el.innerHTML='<div class="meta">Noch keine gemeinsamen Termine.</div>';return}
+ el.innerHTML=list.map(a=>`<div class="calendar-item"><div class="date">${esc(a.title)}</div><div class="meta">${esc(new Date(a.date+"T00:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"}))}${a.time?" · "+esc(a.time)+" Uhr":""}${a.note?" · "+esc(a.note):""}</div><div class="calendar-actions"><button type="button" onclick='makeICS(${JSON.stringify(a).replace(/</g,"\\u003c")})'>📲 In Kalender übernehmen</button><button type="button" class="danger" onclick="deleteAppointment('${a.id}')">Löschen</button></div></div>`).join("");
+}
+
+if(profile)$("profile").value=profile;
+if(houseCode){$("houseCode").value=houseCode;connect()}
+</script>
+</body>
+</html>
