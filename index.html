@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6b7d5a">
+<title>Unser Haushaltsplan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f3ee;--card:#fff;--text:#263028;--muted:#68736b;--accent:#6b7d5a;--accent2:#dfe8d9;--line:#e6e3dc;--danger:#a54d4d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:var(--accent);color:#fff;padding:20px 16px}h1{font-size:24px;margin:0 0 4px}header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:900px;margin:auto;padding:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 2px 10px #00000008}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+button,input,select,textarea{font:inherit}button{border:0;border-radius:12px;padding:10px 13px;background:var(--accent);color:white;font-weight:650}button.secondary{background:var(--accent2);color:var(--text)}button.danger{background:#f3dcdc;color:#7d2f2f}
+input,select,textarea{border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff;color:var(--text)}
+.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.tab{white-space:nowrap}.tab.active{background:var(--accent)}
+.progress{height:10px;background:#ebe9e3;border-radius:20px;overflow:hidden}.bar{height:100%;background:var(--accent);width:0}
+.task{border:1px solid var(--line);border-radius:15px;padding:12px;margin:9px 0;display:flex;gap:12px;align-items:flex-start}.task.done{opacity:.55}
+.task input[type=checkbox]{width:23px;height:23px;margin-top:2px;accent-color:var(--accent)}.taskmain{flex:1;min-width:0}.title{font-weight:700}.meta{font-size:12px;color:var(--muted);margin-top:4px}
+.badge{display:inline-block;background:var(--accent2);padding:3px 7px;border-radius:99px;font-size:11px;margin-right:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}.stat{background:#faf9f6;border:1px solid var(--line);border-radius:14px;padding:12px}.stat b{font-size:21px;display:block}
+.muted{color:var(--muted)}.notice{background:#fff8e7;border:1px solid #ead9a7;padding:12px;border-radius:13px}.hidden{display:none!important}
+#setup{position:fixed;inset:0;background:#f5f3ee;z-index:20;padding:20px;overflow:auto}#setup .box{max-width:600px;margin:30px auto}
+</style>
+</head>
+<body>
+<div id="setup"><div class="box card">
+<h2>Unser Haushaltsplan verbinden</h2>
+<p>Gib euren gemeinsamen Haushaltscode ein. Auf beiden Handys denselben Code verwenden.</p>
+<input id="houseCode" placeholder="z. B. MEINHAUSHALT" style="width:100%;text-transform:uppercase">
+<div style="margin-top:10px"><button id="connect">Verbinden</button></div>
+<p id="setupMsg" class="muted"></p>
+<p class="muted">Der Code ist nur ein einfacher gemeinsamer Schlüssel. Teile ihn nicht öffentlich.</p>
+</div></div>
+
+<header><h1>Unser Haushaltsplan</h1><p>Gemeinsam organisiert – mit Rücksicht auf Schwangerschaft und Hund.</p></header>
+<main>
+<div class="card"><div class="row between"><div><b>Synchronisation</b><div id="sync" class="muted">Verbinde…</div></div><button class="secondary" id="changeCode">Haushalt wechseln</button></div></div>
+<div class="tabs">
+<button class="tab active" data-filter="today">Heute</button><button class="tab secondary" data-filter="weekly">Woche</button><button class="tab secondary" data-filter="monthly">Monat</button><button class="tab secondary" data-filter="all">Alle</button>
+</div>
+<div class="card"><div class="row between"><b>Fortschritt</b><span id="progressText"></span></div><div class="progress"><div class="bar" id="bar"></div></div></div>
+<div class="card"><div class="grid" id="stats"></div></div>
+<div id="tasks"></div>
+<div class="card">
+<h3>Neue Aufgabe</h3>
+<div class="grid">
+<input id="newTitle" placeholder="z. B. Müll rausbringen">
+<select id="newRoom"><option>Wohnzimmer + Küche</option><option>Schlafzimmer</option><option>Bad</option><option>Flur</option><option>HWR</option><option>Hund</option></select>
+<select id="newFreq"><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="monthly">Monatlich</option></select>
+<select id="newAssignee"><option>Ich</option><option>Partnerin</option><option>Gemeinsam</option></select>
+<select id="newEffort"><option>leicht</option><option>besser übernehmen</option></select>
+</div><div style="margin-top:9px"><button id="add">Aufgabe hinzufügen</button></div>
+</div>
+<div class="card"><h3>Notizen</h3><textarea id="notes" rows="3" style="width:100%" placeholder="Einkäufe, Absprachen, wichtige Hinweise…"></textarea></div>
+<div class="card notice"><b>Schwangerschaft:</b> Aufgaben mit „besser übernehmen“ sind bewusst markiert. Die App ersetzt keine individuelle medizinische Empfehlung.</div>
+</main>
+
+<script>
+const SUPABASE_URL="https://rvhvqjewgzoyflqdrgvs.supabase.co";
+const SUPABASE_KEY="sb_publishable_lXhFMjHOQc3-g_c3swkMAT".replace("lXhFMj","lXhFMj"); // publishable key
+const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const DEFAULT_TASKS=[
+["Wohnzimmer aufräumen","Wohnzimmer + Küche","daily",2,"leicht","Gemeinsam"],
+["Küche Arbeitsflächen wischen","Wohnzimmer + Küche","daily",2,"leicht","Ich"],
+["Spülmaschine ein-/ausräumen","Wohnzimmer + Küche","daily",2,"leicht","Partnerin"],
+["Esstisch abwischen","Wohnzimmer + Küche","daily",1,"leicht","Gemeinsam"],
+["Bett machen","Schlafzimmer","daily",1,"leicht","Partnerin"],
+["Bad kurz sauber halten","Bad","daily",2,"leicht","Ich"],
+["Hund füttern","Hund","daily",2,"leicht","Partnerin"],
+["Hund Wasser auffüllen","Hund","daily",1,"leicht","Ich"],
+["Hund kurz ausführen","Hund","daily",3,"leicht","Gemeinsam"],
+["Flur saugen","Flur","weekly",3,"leicht","Ich"],
+["Wohnzimmer saugen","Wohnzimmer + Küche","weekly",3,"leicht","Partnerin"],
+["Schlafzimmer saugen","Schlafzimmer","weekly",3,"leicht","Ich"],
+["Bad gründlich reinigen","Bad","weekly",5,"besser übernehmen","Ich"],
+["Dusche reinigen","Bad","weekly",4,"besser übernehmen","Ich"],
+["Handtücher wechseln","Bad","weekly",2,"leicht","Partnerin"],
+["Wäsche waschen","HWR","weekly",3,"leicht","Partnerin"],
+["Wäsche zusammenlegen","HWR","weekly",3,"leicht","Ich"],
+["Kühlschrank kontrollieren","Wohnzimmer + Küche","weekly",2,"leicht","Gemeinsam"],
+["Vorräte prüfen","HWR","weekly",2,"leicht","Gemeinsam"],
+["Bettwäsche wechseln","Schlafzimmer","monthly",4,"leicht","Gemeinsam"],
+["Kühlschrank gründlich reinigen","Wohnzimmer + Küche","monthly",5,"besser übernehmen","Ich"],
+["HWR aufräumen","HWR","monthly",4,"leicht","Ich"],
+["Fenster innen reinigen","Wohnzimmer + Küche","monthly",5,"besser übernehmen","Ich"]
+];
+let state=null,filter="today",houseCode=localStorage.getItem("household_code")||"";
+
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function freshState(){return {tasks:DEFAULT_TASKS.map((x,i)=>({id:"t"+i,title:x[0],room:x[1],freq:x[2],points:x[3],effort:x[4],assignee:x[5],done:false})),scores:{Ich:0,Partnerin:0,Gemeinsam:0},lastReset:"",customNotes:""}}
+function reset(){if(state && state.lastReset!==new Date().toISOString().slice(0,10)){state.tasks.forEach(t=>t.done=false);state.lastReset=new Date().toISOString().slice(0,10)}}
+function visible(t){return filter==="today"?t.freq==="daily":filter==="weekly"?t.freq==="daily"||t.freq==="weekly":filter==="monthly"?t.freq==="monthly":true}
+async function getState(){
+ const {data,error}=await client.from("household_state").select("state,updated_at").eq("id",houseCode).maybeSingle();
+ if(error)throw error;
+ if(!data){state=freshState();await putState();}else state=data.state;
+ reset();render();
+}
+async function putState(){
+ const {error}=await client.from("household_state").upsert({id:houseCode,state,updated_at:new Date().toISOString()});
+ if(error)throw error;
+}
+async function save(){try{$("sync").textContent="Speichere…";await putState();$("sync").textContent="Synchronisiert"}catch(e){$("sync").textContent="Fehler: "+e.message}}
+function render(){
+ reset();let list=state.tasks.filter(visible),done=list.filter(t=>t.done).length;
+ $("progressText").textContent=done+" / "+list.length;$("bar").style.width=(list.length?done/list.length*100:0)+"%";
+ $("tasks").innerHTML="";const groups={};list.forEach(t=>(groups[t.room]??=[]).push(t));
+ Object.entries(groups).forEach(([room,items])=>{let card=document.createElement("div");card.className="card";card.innerHTML="<h3>"+esc(room)+"</h3>";
+ items.forEach(t=>{let el=document.createElement("div");el.className="task"+(t.done?" done":"");el.innerHTML='<input type="checkbox" '+(t.done?"checked":"")+'><div class="taskmain"><div class="title">'+esc(t.title)+'</div><div class="meta"><span class="badge">'+esc(t.assignee)+'</span><span class="badge">'+esc(t.effort)+'</span><span class="badge">'+t.points+' P</span></div></div>';el.querySelector("input").onchange=()=>{t.done=el.querySelector("input").checked;render();save()};card.appendChild(el)});$("tasks").appendChild(card)});
+ $("stats").innerHTML=Object.entries(state.scores).map(([k,v])=>'<div class="stat"><small>'+k+'</small><b>'+v+'</b><small>Punkte</small></div>').join("");$("notes").value=state.customNotes||"";
+}
+async function connect(){
+ houseCode=$("houseCode").value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");
+ if(!houseCode){$("setupMsg").textContent="Bitte einen Haushaltscode eingeben.";return}
+ localStorage.setItem("household_code",houseCode);$("setupMsg").textContent="Verbinde…";
+ try{await getState();$("setup").classList.add("hidden");$("sync").textContent="Synchronisiert"}catch(e){$("setupMsg").textContent="Fehler: "+e.message}}
+$("connect").onclick=connect;
+$("changeCode").onclick=()=>{$("setup").classList.remove("hidden");$("houseCode").value=houseCode};
+$("add").onclick=async()=>{let title=$("newTitle").value.trim();if(!title)return;state.tasks.push({id:"x"+Date.now(),title,room:$("newRoom").value,freq:$("newFreq").value,points:2,effort:$("newEffort").value,assignee:$("newAssignee").value,done:false});$("newTitle").value="";render();await save()};
+$("notes").onchange=async()=>{state.customNotes=$("notes").value;await save()};
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll(".tab").forEach(x=>{x.classList.toggle("active",x===b);x.classList.toggle("secondary",x!==b)});render()});
+if(houseCode){$("houseCode").value=houseCode;connect()}
+</script>
+</body></html>
